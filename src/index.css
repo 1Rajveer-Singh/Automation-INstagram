@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', system-ui, sans-serif;
+  }
+}
+
+/* The Candy Button Base */
+.candy-btn {
+  @apply relative inline-flex items-center justify-center font-heading font-bold px-6 py-3 rounded-full border-2 border-slateDark shadow-pop transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-pop-sm hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-pop-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+}
+
+/* Sticker Card Base */
+.sticker-card {
+  @apply bg-white border-2 border-slateDark rounded-2xl p-6 shadow-pop transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 hover:rotate-[-0.5deg] hover:shadow-pop-md;
+}
+
+/* Hard Form Controls */
+.hard-input {
+  @apply w-full bg-white border-2 border-slateDark rounded-xl px-4 py-3 text-slateDark font-medium placeholder-slate-400 focus:outline-none focus:border-violetBrand focus:shadow-pop-violet transition-all duration-200;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F8FAFC;
+  border-left: 1px solid #CBD5E1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8B5CF6;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7C3AED;
+}
