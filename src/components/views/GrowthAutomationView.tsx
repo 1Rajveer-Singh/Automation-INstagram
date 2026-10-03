@@ -22,6 +22,8 @@ import {
   autoCalibrateCalendarWithCompetitor,
   recalculateCalendarWithTargetMix,
   ensureCaptionHasHookSeoAndTags,
+  getFreshAccountRecommendations,
+  getBioBlueprint,
 } from '../../services/growthEngine';
 import {
   normalizePillarName,
@@ -75,6 +77,10 @@ import {
   Tag,
   Users,
   Folder,
+  Check,
+  Settings,
+  BookOpen,
+  Film,
 } from 'lucide-react';
 
 export const SAVED_CALENDARS_STORAGE_KEY = 'instagrowth_saved_calendars_history_v1';
@@ -97,6 +103,8 @@ interface GrowthAutomationViewProps {
   onNavigate?: (tab: any) => void;
   onOpenStrategyModal?: () => void;
   userId?: string;
+  activeSubTab?: GrowthSubTab;
+  onSubTabChange?: (tab: GrowthSubTab) => void;
 }
 
 const STRATEGY_STORAGE_KEY = 'instagrowth_active_30day_strategy_v3';
@@ -111,6 +119,8 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
   onNavigate,
   onOpenStrategyModal,
   userId = 'default',
+  activeSubTab: controlledSubTab,
+  onSubTabChange,
 }) => {
   // User-scoped storage keys — each Clerk account gets isolated growth data
   const strategyKey = userId === 'default' ? STRATEGY_STORAGE_KEY : `${STRATEGY_STORAGE_KEY}_user_${userId}`;
@@ -119,7 +129,15 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
   const timezoneKey = userId === 'default' ? 'instagrowth_profile_timezone' : `instagrowth_profile_timezone_user_${userId}`;
 
   const { addActivity } = useActivity();
-  const [activeSubTab, setActiveSubTab] = useState<GrowthSubTab>('diagnosis');
+  const [internalSubTab, setInternalSubTab] = useState<GrowthSubTab>('diagnosis');
+  const activeSubTab = controlledSubTab ?? internalSubTab;
+  const setActiveSubTab = (tab: GrowthSubTab) => {
+    if (onSubTabChange) {
+      onSubTabChange(tab);
+    } else {
+      setInternalSubTab(tab);
+    }
+  };
 
   // Real Account Stats computed directly from props
   const realUsername = user?.username || (config.selectedIgUserId ? `user_${config.selectedIgUserId.slice(-4)}` : '');
@@ -183,7 +201,7 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
   };
 
   // Calendar display state
-  const [weekFilter, setWeekFilter] = useState<'all' | 'w1' | 'w2' | 'w3' | 'w4'>('all');
+  const [weekFilter, setWeekFilter] = useState<string>('all');
   const [pillarFilter, setPillarFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
@@ -233,6 +251,7 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
     }
   });
   const [isSavedCalendarsModalOpen, setIsSavedCalendarsModalOpen] = useState(false);
+  const [copiedBio, setCopiedBio] = useState(false);
 
   // Cloud sync: fetch saved calendars from Supabase on mount / account switch
   useEffect(() => {
@@ -430,7 +449,7 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
     }
   };
 
-  const prevProfileConfigRef = React.useRef(profile ? `${profile.configuredAt}_${profile.calendarDays}_${JSON.stringify(profile.formatMix)}` : '');
+  const prevProfileConfigRef = React.useRef(profile ? `${profile.configuredAt || ''}_${profile.calendarDays || 30}_${JSON.stringify(profile.formatMix || {})}` : '');
 
   // Account switch listener: reload strategyResult scoped to this user
   useEffect(() => {
@@ -442,24 +461,48 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
     }
   }, [strategyKey]);
 
-  // Auto-synchronize only when user or profile data is intentionally updated and a strategy exists
+  // Auto-synchronize when user or profile data is intentionally updated
   useEffect(() => {
-    // Start clean with zero data for each new account until Instagram API is configured or user generates
-    if (!strategyResult) {
-      return;
-    }
+    if (!profile) return;
 
-    const currentConfigKey = profile ? `${profile.configuredAt}_${profile.calendarDays}_${JSON.stringify(profile.formatMix)}` : '';
+    const currentConfigKey = `${profile.configuredAt || ''}_${profile.calendarDays || 30}_${JSON.stringify(profile.formatMix || {})}`;
     const hasConfigChanged = Boolean(currentConfigKey && currentConfigKey !== prevProfileConfigRef.current);
     prevProfileConfigRef.current = currentConfigKey;
 
     if (hasConfigChanged) {
-      handleGenerateStrategy();
+      const targetDays = profile.calendarDays || 30;
+      const effectiveMix = profile.formatMix || { reels: 15, carousels: 10, videos: 3, singlePosts: 2, stories: 30 };
+
+      if (strategyResult?.calendar && strategyResult.calendar.length > 0) {
+        // Fast deterministic synchronization with user's target content mix & horizon
+        const updatedCalendar = recalculateCalendarWithTargetMix(
+          strategyResult.calendar,
+          effectiveMix,
+          targetDays,
+          profileTimezone.standardCode,
+          profile.competitorHandles || [],
+          profile.subNiche || 'Growth Strategy'
+        );
+        const updatedPlan: FullGrowthStrategyResult = {
+          ...strategyResult,
+          targetDays,
+          targetMix: effectiveMix,
+          calendar: updatedCalendar,
+        };
+        setStrategyResult(updatedPlan);
+        localStorage.setItem(strategyKey, JSON.stringify(updatedPlan));
+        addActivity(
+          `Calendar updated to ${targetDays} days with Target Content Mix (${effectiveMix.reels} Reels, ${effectiveMix.carousels} Carousels, ${effectiveMix.videos} Videos, ${effectiveMix.singlePosts} Singles)!`,
+          'success'
+        );
+      } else {
+        handleGenerateStrategy();
+      }
       return;
     }
 
     // Auto-refresh only when real connected account username changes
-    if (user && user.username && strategyResult.accountUsername && strategyResult.accountUsername !== user.username) {
+    if (user && user.username && strategyResult?.accountUsername && strategyResult.accountUsername !== user.username) {
       handleGenerateStrategy();
     }
   }, [user?.username, profile?.subNiche, profile?.calendarDays, profile?.configuredAt, profile?.formatMix]);
@@ -468,11 +511,15 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
   const filteredCalendar = useMemo(() => {
     if (!strategyResult?.calendar) return [];
     return strategyResult.calendar.filter(item => {
-      // Week filter
-      if (weekFilter === 'w1' && (item.day < 1 || item.day > 7)) return false;
-      if (weekFilter === 'w2' && (item.day < 8 || item.day > 14)) return false;
-      if (weekFilter === 'w3' && (item.day < 15 || item.day > 21)) return false;
-      if (weekFilter === 'w4' && (item.day < 22 || item.day > 30)) return false;
+      // Dynamic week filter supporting any number of weeks (7, 14, 30, 60 days)
+      if (weekFilter.startsWith('w')) {
+        const weekNum = parseInt(weekFilter.slice(1), 10);
+        if (!isNaN(weekNum)) {
+          const startDay = (weekNum - 1) * 7 + 1;
+          const endDay = weekNum * 7;
+          if (item.day < startDay || item.day > endDay) return false;
+        }
+      }
 
       // Pillar filter
       if (pillarFilter !== 'all' && item.pillar.toLowerCase() !== pillarFilter.toLowerCase()) return false;
@@ -491,6 +538,30 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
       return true;
     });
   }, [strategyResult, weekFilter, pillarFilter, searchQuery]);
+
+  // Live tally of actual format counts in current calendar
+  const actualFormatCounts = useMemo(() => {
+    if (!strategyResult?.calendar) return { reels: 0, carousels: 0, videos: 0, singlePosts: 0, stories: 0, total: 0 };
+    let reels = 0;
+    let carousels = 0;
+    let videos = 0;
+    let singlePosts = 0;
+    strategyResult.calendar.forEach(c => {
+      const fmt = (c.visualFormat || '').toLowerCase();
+      if (fmt.includes('carousel')) carousels++;
+      else if (fmt.includes('video')) videos++;
+      else if (fmt.includes('single') || fmt.includes('photo') || fmt.includes('image')) singlePosts++;
+      else reels++;
+    });
+    return {
+      reels,
+      carousels,
+      videos,
+      singlePosts,
+      stories: profile?.formatMix?.stories ?? 30,
+      total: strategyResult.calendar.length,
+    };
+  }, [strategyResult?.calendar, profile?.formatMix?.stories]);
 
   // Precompute day counts for multi-post day grouping in table
   const dayGroupMap = useMemo(() => {
@@ -686,10 +757,14 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
       strategyResult.calendar,
       targetMix,
       targetDays,
-      profileTimezone.standardCode
+      profileTimezone.standardCode,
+      profile?.competitorHandles || [],
+      profile?.subNiche || 'Growth Strategy'
     );
     const updatedPlan: FullGrowthStrategyResult = {
       ...strategyResult,
+      targetDays,
+      targetMix,
       calendar: updatedCal,
     };
     setStrategyResult(updatedPlan);
@@ -1251,51 +1326,84 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
               </div>
             </div>
 
+            {/* Target Content Mix Alignment Banner */}
+            <div className="bg-gradient-to-r from-violet-50 to-pink-50 p-3.5 sm:p-4 rounded-2xl border-2 border-slateDark flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-pop-sm">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-heading font-black text-xs text-slateDark tracking-wide uppercase">
+                    Target Content Mix Alignment ({profile?.calendarDays || 30}-Day Planning Horizon)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs">
+                  <span className="px-2.5 py-1 rounded-xl bg-pink-100 border border-pink-300 font-heading font-bold text-pink-900 shadow-xs">
+                    🎬 Reels: <strong className="font-mono">{actualFormatCounts.reels}</strong> / {targetMix.reels}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-xl bg-yellow-100 border border-yellow-300 font-heading font-bold text-yellow-900 shadow-xs">
+                    🎠 Carousels: <strong className="font-mono">{actualFormatCounts.carousels}</strong> / {targetMix.carousels}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-xl bg-blue-100 border border-blue-300 font-heading font-bold text-blue-900 shadow-xs">
+                    🎥 Videos: <strong className="font-mono">{actualFormatCounts.videos}</strong> / {targetMix.videos}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-xl bg-emerald-100 border border-emerald-300 font-heading font-bold text-emerald-900 shadow-xs">
+                    📸 Singles: <strong className="font-mono">{actualFormatCounts.singlePosts}</strong> / {targetMix.singlePosts}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-xl bg-purple-100 border border-purple-300 font-heading font-bold text-purple-900 shadow-xs">
+                    📱 Stories: <strong className="font-mono">{targetMix.stories}</strong>
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-stretch md:self-auto justify-end flex-wrap">
+                <button
+                  onClick={handleApplyTargetMix}
+                  className="px-3 py-1.5 rounded-xl border-2 border-slateDark bg-white hover:bg-slate-50 text-[11px] font-heading font-black text-slateDark shadow-pop-sm flex items-center gap-1.5 cursor-pointer active:translate-y-0.5"
+                  title="Re-balance calendar slots to strictly match Target Content Mix"
+                >
+                  <RefreshCw size={12} className="text-violetBrand" />
+                  <span>Re-Sync Mix</span>
+                </button>
+                {onOpenStrategyModal && (
+                  <button
+                    onClick={onOpenStrategyModal}
+                    className="px-3 py-1.5 rounded-xl border-2 border-slateDark bg-violetBrand text-white hover:bg-violet-600 text-[11px] font-heading font-black shadow-pop-sm flex items-center gap-1.5 cursor-pointer active:translate-y-0.5"
+                  >
+                    <SlidersHorizontal size={12} />
+                    <span>Edit Strategy Form</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Filter Row */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               {/* Week filter pills */}
-              <div className="flex items-center p-1 bg-slate-100 border-2 border-slateDark rounded-xl gap-1 overflow-x-auto scrollbar-none">
-                <button
-                  onClick={() => setWeekFilter('all')}
-                  className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
-                    weekFilter === 'all' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
-                  }`}
-                >
-                  All {strategyResult?.calendar?.length || profile?.calendarDays || 30} Days
-                </button>
-                <button
-                  onClick={() => setWeekFilter('w1')}
-                  className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
-                    weekFilter === 'w1' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
-                  }`}
-                >
-                  Week 1
-                </button>
-                <button
-                  onClick={() => setWeekFilter('w2')}
-                  className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
-                    weekFilter === 'w2' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
-                  }`}
-                >
-                  Week 2
-                </button>
-                <button
-                  onClick={() => setWeekFilter('w3')}
-                  className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
-                    weekFilter === 'w3' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
-                  }`}
-                >
-                  Week 3
-                </button>
-                <button
-                  onClick={() => setWeekFilter('w4')}
-                  className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
-                    weekFilter === 'w4' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
-                  }`}
-                >
-                  Week 4
-                </button>
-              </div>
+              {(() => {
+                const actualDays = profile?.calendarDays || (strategyResult?.calendar ? Math.max(...strategyResult.calendar.map(c => c.day), 7) : 7);
+                const numWeeks = Math.max(1, Math.ceil(actualDays / 7));
+                return (
+                  <div className="flex items-center p-1 bg-slate-100 border-2 border-slateDark rounded-xl gap-1 overflow-x-auto scrollbar-none">
+                    <button
+                      onClick={() => setWeekFilter('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
+                        weekFilter === 'all' ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
+                      }`}
+                    >
+                      All ({actualDays} Days)
+                    </button>
+                    {Array.from({ length: numWeeks }).map((_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setWeekFilter(`w${i + 1}` as any)}
+                        className={`px-3 py-1 rounded-lg text-xs font-heading font-black whitespace-nowrap transition-all cursor-pointer ${
+                          weekFilter === `w${i + 1}` ? 'bg-yellowPop text-slateDark border border-slateDark' : 'text-slate-600 hover:text-slateDark'
+                        }`}
+                      >
+                        Week {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* Dynamic Niche Pillar Filter */}
               {(() => {
@@ -1342,12 +1450,12 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
                     <th className="p-3 min-w-[85px]">Platform</th>
                     <th className="p-3 min-w-[80px]">Status</th>
                     <th className="p-3 min-w-[130px]">Content Pillar</th>
-                    <th className="p-3 min-w-[200px]">Post Topic</th>
+                    <th className="p-3 min-w-[220px]">Post Topic & Production Idea</th>
                     <th className="p-3 min-w-[95px]">Visual Type</th>
                     <th className="p-3 min-w-[100px] text-center">Media URL</th>
                     <th className="p-3 min-w-[100px]">Cover URL</th>
                     <th className="p-3 min-w-[240px]">Caption</th>
-                    <th className="p-3 w-28 text-center sticky right-0 bg-slate-100 border-l border-slate-300">Actions</th>
+                    <th className="p-3 w-28 text-center bg-slate-100 border-l border-slate-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -1424,10 +1532,39 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
                           </span>
                         </td>
 
-                        {/* 7. Post Topic */}
-                        <td className="p-3 font-bold text-slateDark">
-                          <div className="line-clamp-2 max-w-[210px]" title={item.postTopic}>
-                            {item.postTopic}
+                        {/* 7. Post Topic & Production Blueprint */}
+                        <td className="p-3 font-bold text-slateDark min-w-[220px]">
+                          <div className="space-y-1.5">
+                            <div className="line-clamp-2 max-w-[210px] text-xs leading-snug" title={item.postTopic}>
+                              {item.postTopic}
+                            </div>
+                            
+                            {/* Rich Category & Duration Badges */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-800 text-[10px] font-black border border-violet-200">
+                                {item.ideaCategory || item.visualFormat}
+                              </span>
+                              {item.targetDuration && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-mono font-bold border border-amber-200">
+                                  ⏱ {item.targetDuration}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Timeline scenes preview if available */}
+                            {item.timelineScenes && (
+                              <details className="text-[10px] text-slate-500 font-normal cursor-pointer group/details">
+                                <summary className="font-heading font-bold text-violet-700 hover:text-violet-900 list-none flex items-center gap-1">
+                                  <span>🎬 Production Blueprint</span>
+                                </summary>
+                                <div className="mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 whitespace-pre-line font-sans text-[10px] leading-tight space-y-1">
+                                  <div><strong className="text-slateDark font-bold">Scenes:</strong>\n{item.timelineScenes}</div>
+                                  {item.fullScript && (
+                                    <div className="pt-1 border-t border-slate-200"><strong className="text-slateDark font-bold">Script:</strong>\n{item.fullScript}</div>
+                                  )}
+                                </div>
+                              </details>
+                            )}
                           </div>
                         </td>
 
@@ -1528,7 +1665,7 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
                         </td>
 
                         {/* 12. Actions */}
-                        <td className="p-3 text-center sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-200">
+                        <td className="p-3 text-center bg-white group-hover:bg-slate-50 border-l border-slate-200">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleStartEdit(item, fullIndex)}
@@ -1568,6 +1705,106 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
       {/* ========================================================================= */}
       {activeSubTab === 'actions' && strategyResult && (
         <div className="w-full space-y-6">
+          {/* Fresh Account In-App Setup Recommendations */}
+          {(() => {
+            const freshSettings = strategyResult.freshAccountSettings || getFreshAccountRecommendations(profile?.subNiche || strategyResult.subNiche || '');
+            return (
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border-3 border-slateDark shadow-pop space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings size={20} className="text-violetBrand" />
+                    <h4 className="font-heading font-black text-slateDark text-lg">
+                      Fresh Account Instagram In-App Settings Blueprint
+                    </h4>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-heading font-black bg-amber-100 text-amber-900 border border-amber-300 self-start sm:self-auto">
+                    Meta Algorithm Prerequisite
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-semibold">
+                  Before launching calendar content, configure these mandatory settings inside your native Instagram app to unlock full Graph API DM funnels and avoid 480p mobile compression:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  {freshSettings.map((s, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl border-2 border-slateDark bg-slate-50 space-y-2 shadow-pop-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-heading font-black text-xs text-slateDark flex items-center gap-1.5">
+                          <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                          {s.settingName}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-mono text-[10px] font-bold">
+                          {s.recommendedValue}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono text-violet-800 bg-violet-50 p-1.5 rounded-lg border border-violet-200">
+                        📍 {s.inAppPath}
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        {s.reason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* SEO Bio Blueprint Card */}
+          {(() => {
+            const bio = strategyResult.bioBlueprint || getBioBlueprint(profile?.subNiche || strategyResult.subNiche || '', profile?.targetAudience || '', strategyResult.accountUsername);
+            const fullBioText = `${bio.nameLine}\n${bio.category}\n${bio.transformationHook}\n${bio.socialProof}\n${bio.callToAction}`;
+            return (
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border-3 border-slateDark shadow-pop space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={20} className="text-pinkPop" />
+                    <h4 className="font-heading font-black text-slateDark text-lg">
+                      Optimized Profile & Bio Blueprint (High-Converting Funnel)
+                    </h4>
+                  </div>
+                  <CandyButton
+                    variant="yellow"
+                    size="sm"
+                    icon={Copy}
+                    onClick={() => {
+                      navigator.clipboard.writeText(fullBioText);
+                      setCopiedBio(true);
+                      setTimeout(() => setCopiedBio(false), 2000);
+                      addActivity('Copied complete Bio Blueprint to clipboard!', 'success');
+                    }}
+                  >
+                    {copiedBio ? 'Copied Full Bio!' : 'Copy Bio Text'}
+                  </CandyButton>
+                </div>
+                <p className="text-xs text-slate-500 font-semibold">
+                  Tailored to rank top of Instagram Search for <strong>{profile?.subNiche || strategyResult.subNiche}</strong> and turn profile visits into DM leads:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  <div className="p-4 bg-cream border-2 border-slateDark rounded-2xl space-y-2 font-mono text-xs text-slateDark shadow-pop-sm">
+                    <div className="text-[10px] font-heading font-black text-slate-400 uppercase">Live Bio Preview</div>
+                    <div className="font-bold text-violetBrand">{bio.nameLine}</div>
+                    <div className="text-slate-500 text-[11px]">{bio.category}</div>
+                    <div>{bio.transformationHook}</div>
+                    <div className="text-slate-600">{bio.socialProof}</div>
+                    <div className="text-amber-800 font-semibold">{bio.callToAction}</div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 border-2 border-slateDark rounded-2xl space-y-2.5 text-xs text-slate-700 shadow-pop-sm">
+                    <div className="text-[10px] font-heading font-black text-slate-400 uppercase">Conversion Breakdown</div>
+                    <div><strong>Name Line:</strong> Weaves the primary search query keyword directly into your display name.</div>
+                    <div><strong>Transformation Hook:</strong> Passes the 5-second clarity test for {profile?.targetAudience || 'your target audience'}.</div>
+                    <div><strong>DM Call to Action:</strong> Triggers frictionless automated lead deliveries without losing traffic to external linktrees.</div>
+                    <div className="p-2 bg-yellowPop/40 rounded-lg border border-slateDark/30 text-[11px] font-medium">
+                      💡 <strong>Link in Bio Tip:</strong> {bio.linkInBioTip}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Next 5 Immediate Actions with Checkbox Completion Tracking */}
           <div className="bg-white p-5 sm:p-6 rounded-3xl border-3 border-slateDark shadow-pop space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1620,6 +1857,42 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
               })}
             </div>
           </div>
+
+          {/* Weekly Sprint Experiments */}
+          {strategyResult.weeklySprints && strategyResult.weeklySprints.length > 0 && (
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border-3 border-slateDark shadow-pop space-y-4">
+              <div className="flex items-center gap-2">
+                <Rocket size={20} className="text-amber-600" />
+                <h4 className="font-heading font-black text-slateDark text-lg">
+                  Weekly Scientific Growth Experiments & Hypotheses
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500 font-semibold">
+                Run one controlled content experiment per week to scientifically validate audience reach levers:
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                {strategyResult.weeklySprints.map((sprint, idx) => (
+                  <div key={idx} className="p-4 rounded-2xl border-2 border-slateDark bg-slate-50 space-y-2 shadow-pop-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-heading font-black text-xs text-slateDark">
+                        {sprint.title}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-heading font-black bg-yellowPop text-slateDark border border-slateDark">
+                        Week {sprint.week}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-violetBrand">{sprint.objective}</p>
+                    <p className="text-xs text-slate-600"><strong className="text-slateDark">Hypothesis:</strong> {sprint.hypothesis}</p>
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
+                      <span className="font-medium text-slate-500"><strong>KPI:</strong> {sprint.kpi}</span>
+                      <span className="font-medium text-emerald-700"><strong>Threshold:</strong> {sprint.threshold}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       )}
@@ -1879,6 +2152,61 @@ export const GrowthAutomationView: React.FC<GrowthAutomationViewProps> = ({
                   value={editingItem.hook}
                   onChange={e => setEditingItem({ ...editingItem, hook: e.target.value })}
                   placeholder="First text-overlay or first spoken sentence"
+                />
+              </div>
+
+              {/* Rich Creative Production Blueprint: Category, Target Duration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-violet-50/60 border-2 border-violet-200 rounded-2xl">
+                <div>
+                  <label className="font-heading text-xs font-bold uppercase tracking-wider text-slateDark block mb-1">
+                    Idea Category
+                  </label>
+                  <select
+                    value={editingItem.ideaCategory || editingItem.visualFormat || 'Reel'}
+                    onChange={e => setEditingItem({ ...editingItem, ideaCategory: e.target.value as any })}
+                    className="w-full p-2 rounded-xl border-2 border-slateDark bg-white text-xs font-bold text-slateDark shadow-pop-sm focus:outline-none"
+                  >
+                    <option value="Reel">Reel (Short-form)</option>
+                    <option value="Post">Single Post</option>
+                    <option value="Carousel">Carousel (Multi-slide)</option>
+                    <option value="Story">Story / Highlight</option>
+                  </select>
+                </div>
+                <HardInput
+                  label="Target Duration"
+                  value={editingItem.targetDuration || ''}
+                  onChange={e => setEditingItem({ ...editingItem, targetDuration: e.target.value })}
+                  placeholder="e.g. 7–15 seconds or 6–8 slides"
+                />
+              </div>
+
+              {/* Timeline Scenes (Scene 1: Hook, Scene 2: Value, Scene 3: CTA) */}
+              <div>
+                <label className="font-heading text-xs font-bold uppercase tracking-wider text-slateDark block mb-1.5 flex items-center gap-1.5">
+                  <Film size={13} className="text-violetBrand" />
+                  Timeline Scenes (Scene 1: Hook, Scene 2: Value, Scene 3: CTA)
+                </label>
+                <textarea
+                  value={editingItem.timelineScenes || ''}
+                  onChange={e => setEditingItem({ ...editingItem, timelineScenes: e.target.value })}
+                  rows={3}
+                  className="w-full p-3 rounded-xl border-2 border-slateDark bg-white text-xs font-medium text-slateDark shadow-pop-sm focus:outline-none font-mono"
+                  placeholder="Scene 1 (0-3s): [Hook] Fast-paced visual hook&#10;Scene 2 (3-8s): [Core Value] The contrarian solution&#10;Scene 3 (8-12s): [CTA] Comment 'GROW' to receive blueprint"
+                />
+              </div>
+
+              {/* Full Voiceover / Slide Script */}
+              <div>
+                <label className="font-heading text-xs font-bold uppercase tracking-wider text-slateDark block mb-1.5 flex items-center gap-1.5">
+                  <BookOpen size={13} className="text-pinkPop" />
+                  Full Spoken Voiceover / Slide Script
+                </label>
+                <textarea
+                  value={editingItem.fullScript || ''}
+                  onChange={e => setEditingItem({ ...editingItem, fullScript: e.target.value })}
+                  rows={3}
+                  className="w-full p-3 rounded-xl border-2 border-slateDark bg-white text-xs font-medium text-slateDark shadow-pop-sm focus:outline-none font-mono"
+                  placeholder="[Spoken audio]: Stop making this costly mistake if you want to scale...&#10;[Spoken audio]: Most people overlook positioning...&#10;[Spoken audio]: Drop 'GROW' below and I'll send you our checklist!"
                 />
               </div>
 

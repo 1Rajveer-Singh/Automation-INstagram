@@ -101,6 +101,61 @@ function localAssetMiddlewarePlugin(): Plugin {
           });
           return;
         }
+
+        // Local development support for /api/webhook
+        if (req.url?.startsWith('/api/webhook')) {
+          try {
+            const mod = await server.ssrLoadModule('./api/webhook.ts');
+            const urlObj = new URL(req.url, 'http://localhost:3000');
+            const query: Record<string, string> = {};
+            urlObj.searchParams.forEach((v, k) => { query[k] = v; });
+
+            let bodyData: any = {};
+            let rawBodyStr = '';
+            if (req.method === 'POST') {
+              const buffers: any[] = [];
+              for await (const chunk of req) {
+                buffers.push(chunk);
+              }
+              rawBodyStr = Buffer.concat(buffers).toString('utf-8');
+              try { bodyData = JSON.parse(rawBodyStr); } catch { bodyData = {}; }
+            }
+
+            const mockReq = {
+              method: req.method,
+              query,
+              headers: req.headers,
+              body: bodyData,
+              rawBody: rawBodyStr,
+            };
+
+            const mockRes = {
+              statusCode: 200,
+              headers: {} as Record<string, string>,
+              status(code: number) { this.statusCode = code; return this; },
+              setHeader(k: string, v: string) { this.headers[k] = v; return this; },
+              send(data: any) {
+                res.statusCode = this.statusCode;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end(String(data));
+              },
+              json(data: any) {
+                res.statusCode = this.statusCode;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(data));
+              },
+            };
+
+            await mod.default(mockReq, mockRes);
+            return;
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err?.message || 'API endpoint error' }));
+            return;
+          }
+        }
+
         next();
       });
     },
@@ -111,6 +166,7 @@ export default defineConfig({
   plugins: [react(), localAssetMiddlewarePlugin()],
   server: {
     port: 3000,
+    host: true,
     open: false,
   },
 });

@@ -95,47 +95,60 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline text-xs font-bold text-slateDark">Activity Log</span>
           </button>
 
-          {/* Activity Dropdown Menu */}
+          {/* Activity Dropdown Menu (Mobile Responsive) */}
           {isOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border-3 border-slateDark rounded-2xl shadow-pop-lg z-50 p-4 space-y-3 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between pb-2 border-b-2 border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Bell size={16} className="text-violetBrand" />
-                  <h3 className="font-heading text-sm font-black text-slateDark">System Activity Log</h3>
-                </div>
-                {activities.length > 0 && (
-                  <button
-                    onClick={clearActivities}
-                    className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1"
-                  >
-                    <Trash2 size={12} /> Clear
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                {activities.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-4">No recent activity logged.</p>
-                ) : (
-                  activities.map(item => (
-                    <div
-                      key={item.id}
-                      className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-2.5 text-xs"
+            <>
+              {/* Mobile backdrop */}
+              <div className="fixed inset-0 z-40 sm:hidden bg-slate-900/20 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+              <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 w-auto sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white border-3 border-slateDark rounded-2xl shadow-pop-lg z-50 p-3.5 sm:p-4 space-y-3 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between pb-2 border-b-2 border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Bell size={16} className="text-violetBrand" />
+                    <h3 className="font-heading text-xs sm:text-sm font-black text-slateDark">System Activity Log</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {activities.length > 0 && (
+                      <button
+                        onClick={clearActivities}
+                        className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 size={12} /> Clear
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsOpen(false)}
+                      className="sm:hidden p-1 text-slate-400 hover:text-slateDark rounded-lg"
+                      aria-label="Close activity log"
                     >
-                      <div className="mt-0.5 shrink-0">
-                        {item.type === 'success' && <CheckCircle2 size={15} className="text-emerald-600" />}
-                        {item.type === 'error' && <AlertCircle size={15} className="text-rose-600" />}
-                        {item.type === 'info' && <Info size={15} className="text-violetBrand" />}
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-64 sm:max-h-72 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                  {activities.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No recent activity logged.</p>
+                  ) : (
+                    activities.map(item => (
+                      <div
+                        key={item.id}
+                        className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-2.5 text-xs"
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {item.type === 'success' && <CheckCircle2 size={15} className="text-emerald-600" />}
+                          {item.type === 'error' && <AlertCircle size={15} className="text-rose-600" />}
+                          {item.type === 'info' && <Info size={15} className="text-violetBrand" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slateDark leading-snug break-words">{item.title}</p>
+                          <span className="text-[10px] text-slate-400 font-semibold">{item.timestamp}</span>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slateDark leading-snug">{item.title}</p>
-                        <span className="text-[10px] text-slate-400 font-semibold">{item.timestamp}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
           </div>
 

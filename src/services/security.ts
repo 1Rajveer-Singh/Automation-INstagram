@@ -49,6 +49,7 @@ export interface EnvCredentials {
   appId: string;
   accessToken: string;
   selectedIgUserId: string;
+  isAgentActive?: boolean;
   cloudinaryUrl?: string;
   cloudinaryCloudName?: string;
   cloudinaryApiKey?: string;
@@ -215,6 +216,7 @@ export function loadEnvCredentials(userId?: string): EnvCredentials {
       cloudinaryApiKey: isStaleDemoCloudinary ? '' : (parsed.cloudinaryApiKey || ''),
       cloudinaryApiSecret: isStaleDemoCloudinary ? '' : (parsed.cloudinaryApiSecret || ''),
       cloudinaryUploadPreset: isStaleDemoCloudinary ? '' : (parsed.cloudinaryUploadPreset || ''),
+      isAgentActive: parsed.isAgentActive !== undefined ? Boolean(parsed.isAgentActive) : true,
     };
   } catch (err) {
     return envFromFiles;

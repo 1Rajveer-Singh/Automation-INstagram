@@ -14,6 +14,9 @@ import {
   Clock,
   Calendar,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Trophy,
 } from 'lucide-react';
 
 interface InsightsViewProps {
@@ -39,6 +42,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({ config }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('day');
   const [isLoading, setIsLoading] = useState(false);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 5;
 
   useEffect(() => {
     async function loadData() {
@@ -46,9 +51,15 @@ export const InsightsView: React.FC<InsightsViewProps> = ({ config }) => {
       setIsLoading(true);
       try {
         const posts = await getMediaPosts(config.selectedIgUserId, config.accessToken);
-        setMediaPosts(posts);
-        if (posts.length > 0) {
-          setSelectedPostId(posts[0].id);
+        // Rank posts by popularity: highest to lowest
+        const sorted = [...posts].sort((a, b) => {
+          const scoreA = (a.like_count || 0) + (a.comments_count || 0) * 2;
+          const scoreB = (b.like_count || 0) + (b.comments_count || 0) * 2;
+          return scoreB - scoreA;
+        });
+        setMediaPosts(sorted);
+        if (sorted.length > 0) {
+          setSelectedPostId(sorted[0].id);
         }
 
         const insightData = await getAccountInsights(config.selectedIgUserId, config.accessToken);
@@ -237,7 +248,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({ config }) => {
         <div className="w-full lg:w-80 shrink-0 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-base font-black text-slateDark flex items-center gap-1.5">
-              <Sparkles size={16} className="text-amber-500" /> Account Live Posts Feed
+              <Trophy size={16} className="text-amber-500" /> Ranked by Popularity
             </h2>
             <span className="text-xs font-mono font-bold text-slate-500">{mediaPosts.length} Posts</span>
           </div>
@@ -247,64 +258,119 @@ export const InsightsView: React.FC<InsightsViewProps> = ({ config }) => {
               No live media posts returned from Meta Graph API.
             </div>
           ) : (
-            <div className="space-y-3 max-h-[700px] overflow-y-auto pr-1">
-              {mediaPosts.map(p => {
-                const isSelected = selectedPostId === p.id;
-                const pDate = new Date(p.timestamp);
+            <>
+              <div className="space-y-3">
+                {(() => {
+                  const totalPages = Math.max(1, Math.ceil(mediaPosts.length / POSTS_PER_PAGE));
+                  const validPage = Math.min(currentPage, totalPages);
+                  const paginated = mediaPosts.slice((validPage - 1) * POSTS_PER_PAGE, validPage * POSTS_PER_PAGE);
 
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => setSelectedPostId(p.id)}
-                    className={`cursor-pointer border-2 rounded-2xl p-3 transition-all duration-200 flex gap-3 ${
-                      isSelected
-                        ? 'border-slateDark bg-yellowPop shadow-pop font-bold translate-x-1'
-                        : 'border-slateDark/10 bg-white hover:border-slateDark hover:bg-slate-50'
+                  return paginated.map((p, idx) => {
+                    const isSelected = selectedPostId === p.id;
+                    const pDate = new Date(p.timestamp);
+                    const rankNum = (validPage - 1) * POSTS_PER_PAGE + idx + 1;
+
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => setSelectedPostId(p.id)}
+                        className={`cursor-pointer border-2 rounded-2xl p-3 transition-all duration-200 flex gap-3 relative ${
+                          isSelected
+                            ? 'border-slateDark bg-yellowPop shadow-pop font-bold translate-x-1'
+                            : 'border-slateDark/10 bg-white hover:border-slateDark hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* Rank Badge */}
+                        <div
+                          className={`absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 border-slateDark flex items-center justify-center text-[10px] font-black shadow-pop-sm z-10 ${
+                            rankNum === 1
+                              ? 'bg-amber-400 text-slateDark'
+                              : rankNum === 2
+                              ? 'bg-slate-200 text-slateDark'
+                              : rankNum === 3
+                              ? 'bg-amber-700 text-white'
+                              : 'bg-white text-slate-600'
+                          }`}
+                        >
+                          #{rankNum}
+                        </div>
+
+                        {/* Post Thumbnail */}
+                        <div className="w-16 h-16 bg-slate-100 rounded-xl overflow-hidden border border-slateDark shrink-0 relative">
+                          {p.media_url || p.thumbnail_url ? (
+                            <img
+                              src={p.media_url || p.thumbnail_url}
+                              alt="Post"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-[10px]">
+                              {p.media_type}
+                            </div>
+                          )}
+                          <span className="absolute bottom-0.5 left-0.5 px-1 py-0.2 bg-slateDark text-white text-[8px] font-black rounded">
+                            {p.media_type}
+                          </span>
+                        </div>
+
+                        {/* Post Info Details */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between text-xs">
+                          <p className="font-semibold text-slateDark line-clamp-2 leading-tight">
+                            {p.caption || 'No caption'}
+                          </p>
+                          
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 mt-2">
+                            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-500">
+                              <Clock size={11} className="text-violetBrand" />
+                              {pDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <span className="flex items-center gap-0.5 text-rose-600 font-mono">
+                                <Heart size={11} className="fill-rose-500 text-rose-500" /> {p.like_count || 0}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-violetBrand font-mono">
+                                <MessageCircle size={11} className="fill-violetBrand text-violetBrand" /> {p.comments_count || 0}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Pagination Controls (5 posts per page) */}
+              {mediaPosts.length > POSTS_PER_PAGE && (
+                <div className="flex items-center justify-between p-2.5 bg-white border-2 border-slateDark rounded-xl shadow-pop-sm text-xs font-bold">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={`p-1 rounded-lg border border-slateDark flex items-center justify-center ${
+                      currentPage <= 1 ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-yellowPop hover:bg-yellowPop/80'
                     }`}
                   >
-                    {/* Post Thumbnail */}
-                    <div className="w-16 h-16 bg-slate-100 rounded-xl overflow-hidden border border-slateDark shrink-0 relative">
-                      {p.media_url || p.thumbnail_url ? (
-                        <img
-                          src={p.media_url || p.thumbnail_url}
-                          alt="Post"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-[10px]">
-                          {p.media_type}
-                        </div>
-                      )}
-                      <span className="absolute bottom-0.5 left-0.5 px-1 py-0.2 bg-slateDark text-white text-[8px] font-black rounded">
-                        {p.media_type}
-                      </span>
-                    </div>
+                    <ChevronLeft size={16} />
+                  </button>
 
-                    {/* Post Info Details */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between text-xs">
-                      <p className="font-semibold text-slateDark line-clamp-2 leading-tight">
-                        {p.caption || 'No caption'}
-                      </p>
-                      
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 mt-2">
-                        <span className="flex items-center gap-1 font-mono text-[10px] text-slate-500">
-                          <Clock size={11} className="text-violetBrand" />
-                          {pDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span className="flex items-center gap-0.5 text-rose-600 font-mono">
-                            <Heart size={11} className="fill-rose-500 text-rose-500" /> {p.like_count}
-                          </span>
-                          <span className="flex items-center gap-0.5 text-violetBrand font-mono">
-                            <MessageCircle size={11} className="fill-violetBrand text-violetBrand" /> {p.comments_count}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  <span className="font-heading font-black text-slateDark text-[11px]">
+                    Page {currentPage} of {Math.ceil(mediaPosts.length / POSTS_PER_PAGE)}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={currentPage >= Math.ceil(mediaPosts.length / POSTS_PER_PAGE)}
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(mediaPosts.length / POSTS_PER_PAGE), prev + 1))}
+                    className={`p-1 rounded-lg border border-slateDark flex items-center justify-center ${
+                      currentPage >= Math.ceil(mediaPosts.length / POSTS_PER_PAGE) ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-yellowPop hover:bg-yellowPop/80'
+                    }`}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

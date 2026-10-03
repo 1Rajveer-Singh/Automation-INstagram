@@ -172,9 +172,14 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
       setCrawlHistory(updatedHistory);
       localStorage.setItem(getScopedKey('bd_crawl_history', userId), JSON.stringify(updatedHistory));
 
-      addActivity(`Successfully crawled profile @${data.username} (${data.recent_media.length} media posts analyzed).`, 'success');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Competitor business discovery failed.');
+      const msg = err?.message || '';
+      const isPrivateOrPersonal = /private|permission|unsupported|not found|does not exist|OAuthException/i.test(msg);
+      if (isPrivateOrPersonal) {
+        setErrorMsg(`Account @${handle} is either Private or Personal: Meta Graph API strictly protects private account data and only permits discovery on Public Business/Creator profiles.`);
+      } else {
+        setErrorMsg(err.message || 'Competitor business discovery failed.');
+      }
       addActivity(`Crawl failed for @${handle}: ${err.message}`, 'error');
     } finally {
       setIsSearching(false);
@@ -214,7 +219,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
         shadowColor="violet"
       >
         {/* Discovery Mode Switcher */}
-        <div className="bg-slate-100 p-1 rounded-2xl border-2 border-slateDark flex items-center gap-1.5 w-fit mb-5 shadow-sm">
+        <div className="bg-slate-100 p-1 sm:p-1.5 rounded-2xl border-2 border-slateDark flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full sm:w-fit mb-5 shadow-sm max-w-full">
           <button
             type="button"
             onClick={() => {
@@ -223,15 +228,15 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                 setTargetUser(result.username);
               }
             }}
-            className={`px-3.5 py-1.5 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 sm:py-1.5 rounded-xl font-heading font-black text-xs transition-all flex items-center justify-center sm:justify-start gap-1.5 w-full sm:w-auto ${
               discoveryMode === 'profile'
                 ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                 : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
             }`}
           >
-            <Compass size={14} />
-            <span>Profile Discovery</span>
-            {result && <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/20 font-mono">@{result.username}</span>}
+            <Compass size={14} className="shrink-0" />
+            <span className="truncate">Profile Discovery</span>
+            {result && <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/20 font-mono truncate max-w-[120px] sm:max-w-none">@{result.username}</span>}
           </button>
 
           <button
@@ -242,19 +247,19 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                 setTargetUser(postResult.permalink);
               }
             }}
-            className={`px-3.5 py-1.5 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 sm:py-1.5 rounded-xl font-heading font-black text-xs transition-all flex items-center justify-center sm:justify-start gap-1.5 w-full sm:w-auto ${
               discoveryMode === 'post'
                 ? 'bg-yellowPop text-slateDark border-2 border-slateDark shadow-pop-sm'
                 : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
             }`}
           >
-            <Play size={13} className="fill-current" />
-            <span>Reel & Post Deep-Dive</span>
-            {postResult && <span className="text-[10px] px-1.5 py-0.2 rounded bg-slateDark/10 font-mono">{postResult.shortcode}</span>}
+            <Play size={13} className="fill-current shrink-0" />
+            <span className="truncate">Reel & Post Deep-Dive</span>
+            {postResult && <span className="text-[10px] px-1.5 py-0.2 rounded bg-slateDark/10 font-mono truncate max-w-[100px] sm:max-w-none">{postResult.shortcode}</span>}
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-end gap-3 max-w-xl">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 max-w-xl w-full">
           <HardInput
             label={discoveryMode === 'post' ? "Instagram Reel or Post URL" : "Target Competitor Username or URL"}
             placeholder={
@@ -264,6 +269,11 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             }
             value={targetUser}
             onChange={e => setTargetUser(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                handleSearch();
+              }
+            }}
             badge={discoveryMode === 'post' ? "Reel / Post URL" : "Business / Creator"}
           />
           <CandyButton
@@ -272,7 +282,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             onClick={() => handleSearch()}
             disabled={isSearching}
             icon={discoveryMode === 'post' ? Sparkles : Search}
-            className="shrink-0 mb-0.5"
+            className="shrink-0 mb-0.5 w-full sm:w-auto justify-center"
           >
             {isSearching
               ? 'Analyzing...'
@@ -280,6 +290,20 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
               ? 'Extract Mechanisms'
               : 'Crawl & Analyze'}
           </CandyButton>
+        </div>
+
+        {/* Meta Graph API Account Support Matrix */}
+        <div className="flex items-center gap-2 flex-wrap text-[11px] pt-1 font-semibold text-slate-500">
+          <span className="font-bold text-slateDark">Crawl Capability:</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
+            🟢 Public Creator/Business (100% Crawlable)
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
+            🟡 Following (Crawlable if Public)
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300" title="Protected by Meta privacy rules">
+            🔒 Private Accounts (Protected by Meta)
+          </span>
         </div>
 
         {/* Niche Configured Competitors */}
@@ -426,41 +450,41 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
         <div className="space-y-6">
           {/* Profile Header Card */}
           <StickerCard shadowColor="yellow" className="bg-white">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-5 border-b-2 border-slateDark/10">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-5 border-b-2 border-slateDark/10 w-full min-w-0">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5 sm:gap-4 w-full min-w-0">
                 {result.profile_picture_url ? (
                   <img
                     src={result.profile_picture_url}
                     alt={result.username}
-                    className="w-16 h-16 rounded-full border-3 border-slateDark shadow-pop object-cover shrink-0"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-3 border-slateDark shadow-pop object-cover shrink-0"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-full border-3 border-slateDark bg-violet-100 flex items-center justify-center font-heading font-black text-xl text-violetBrand shadow-pop shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-3 border-slateDark bg-violet-100 flex items-center justify-center font-heading font-black text-xl text-violetBrand shadow-pop shrink-0">
                     @{result.username.slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-heading text-2xl font-black text-slateDark">@{result.username}</h2>
+                <div className="space-y-1.5 min-w-0 flex-1 w-full overflow-hidden">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h2 className="font-heading text-xl sm:text-2xl font-black text-slateDark break-all leading-tight">@{result.username}</h2>
                     {result.name && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-mintPop text-slateDark border border-slateDark">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-mintPop text-slateDark border border-slateDark max-w-full truncate">
                         {result.name}
                       </span>
                     )}
                     {result.analytics?.engagementTier && (
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-black border border-slateDark flex items-center gap-1 ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-black border border-slateDark flex items-center gap-1 shrink-0 ${
                         result.analytics.engagementTier === 'Viral' ? 'bg-yellowPop text-slateDark' :
                         result.analytics.engagementTier === 'High' ? 'bg-mintPop text-slateDark' :
                         result.analytics.engagementTier === 'Moderate' ? 'bg-sky-200 text-slateDark' :
                         'bg-rose-100 text-rose-700'
                       }`}>
-                        <Flame size={12} className="fill-current" />
+                        <Flame size={12} className="fill-current shrink-0" />
                         <span>{result.analytics.engagementTier} Engagement</span>
                       </span>
                     )}
                   </div>
                   {result.biography && (
-                    <p className="text-xs text-slate-600 font-medium max-w-2xl line-clamp-2">
+                    <p className="text-xs text-slate-600 font-medium max-w-2xl line-clamp-3 break-words">
                       {result.biography}
                     </p>
                   )}
@@ -469,9 +493,10 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                       href={result.website.startsWith('http') ? result.website : `https://${result.website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[11px] text-violetBrand hover:underline font-bold inline-flex items-center gap-1 font-mono"
+                      className="text-[11px] text-violetBrand hover:underline font-bold inline-flex items-center gap-1 font-mono break-all max-w-full"
                     >
-                      <ExternalLink size={11} /> {result.website}
+                      <ExternalLink size={11} className="shrink-0" />
+                      <span className="truncate">{result.website}</span>
                     </a>
                   )}
                 </div>
@@ -479,50 +504,50 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             </div>
 
             {/* Metric Counters Strip */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 pt-5">
-              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-3.5 shadow-pop-sm flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-300 text-violetBrand flex items-center justify-center shrink-0">
-                  <Users size={18} />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 pt-5">
+              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-2.5 sm:p-3.5 shadow-pop-sm flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-violet-100 border border-violet-300 text-violetBrand flex items-center justify-center shrink-0">
+                  <Users size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Followers</span>
-                  <span className="font-heading text-xl font-black text-slateDark leading-tight">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">Followers</span>
+                  <span className="font-heading text-base sm:text-xl font-black text-slateDark leading-tight block truncate">
                     {(result.followers_count ?? 0).toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-3.5 shadow-pop-sm flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-800 flex items-center justify-center shrink-0">
-                  <Layers size={18} />
+              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-2.5 sm:p-3.5 shadow-pop-sm flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-800 flex items-center justify-center shrink-0">
+                  <Layers size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Posts</span>
-                  <span className="font-heading text-xl font-black text-slateDark leading-tight">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">Total Posts</span>
+                  <span className="font-heading text-base sm:text-xl font-black text-slateDark leading-tight block truncate">
                     {(result.media_count ?? 0).toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-3.5 shadow-pop-sm flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center shrink-0">
-                  <TrendingUp size={18} />
+              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-2.5 sm:p-3.5 shadow-pop-sm flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center shrink-0">
+                  <TrendingUp size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Engagement</span>
-                  <span className="font-heading text-xl font-black text-violetBrand leading-tight">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">Engagement</span>
+                  <span className="font-heading text-base sm:text-xl font-black text-violetBrand leading-tight block truncate">
                     {result.engagement_rate}%
                   </span>
                 </div>
               </div>
 
-              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-3.5 shadow-pop-sm flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-100 border border-sky-300 text-sky-800 flex items-center justify-center shrink-0">
-                  <Clock size={18} />
+              <div className="bg-slate-50 border-2 border-slateDark rounded-2xl p-2.5 sm:p-3.5 shadow-pop-sm flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-100 border border-sky-300 text-sky-800 flex items-center justify-center shrink-0">
+                  <Clock size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Avg Cadence</span>
-                  <span className="font-heading text-xl font-black text-slateDark leading-tight">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">Avg Cadence</span>
+                  <span className="font-heading text-base sm:text-xl font-black text-slateDark leading-tight block truncate">
                     {result.analytics?.cadenceDaysAvg ? `${result.analytics.cadenceDaysAvg}d` : 'Daily'}
                   </span>
                 </div>
@@ -550,11 +575,11 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
           </StickerCard>
 
           {/* Analytics Navigation Tabs */}
-          <div className="bg-slate-100 p-1.5 rounded-2xl border-2 border-slateDark flex items-center gap-1.5 overflow-x-auto shadow-sm">
+          <div className="bg-slate-100 p-1.5 rounded-2xl border-2 border-slateDark flex items-center gap-1.5 overflow-x-auto shadow-sm no-scrollbar">
             <button
               type="button"
               onClick={() => setActiveTab('overview')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'overview'
                   ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                   : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
@@ -571,7 +596,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('timing')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'timing'
                   ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                   : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
@@ -583,7 +608,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('keywords')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'keywords'
                   ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                   : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
@@ -595,7 +620,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('formats')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'formats'
                   ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                   : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
@@ -607,7 +632,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('hashtags')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'hashtags'
                   ? 'bg-violetBrand text-white border-2 border-slateDark shadow-pop-sm'
                   : 'text-slate-600 hover:text-slateDark hover:bg-white/70'
@@ -619,13 +644,13 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('prescription')}
-              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap ml-auto ${
+              className={`px-3.5 py-2 rounded-xl font-heading font-black text-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 activeTab === 'prescription'
                   ? 'bg-yellowPop text-slateDark border-2 border-slateDark shadow-pop-sm'
                   : 'bg-yellow-100/80 text-yellow-900 hover:bg-yellow-100 hover:text-slateDark'
               }`}
             >
-              <Sparkles size={14} className="text-violetBrand" />
+              <Sparkles size={14} className="text-violetBrand shrink-0" />
               <span>Strategic Prescription</span>
             </button>
           </div>
@@ -1057,9 +1082,9 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
           <StickerCard shadowColor="yellow" className="bg-white">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Media Visual Column */}
-              <div className="lg:col-span-5 space-y-3">
+              <div className="lg:col-span-5 space-y-3 w-full min-w-0">
                 {/* View Switcher: Live Reel Player vs Cover Photo */}
-                <div className="flex items-center justify-between pb-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
                   <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-300">
                     <button
                       type="button"
@@ -1070,7 +1095,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                           : 'text-slate-600 hover:text-slateDark'
                       }`}
                     >
-                      <Play size={12} className="fill-current" />
+                      <Play size={12} className="fill-current shrink-0" />
                       <span>Real Reel / Player</span>
                     </button>
                     <button
@@ -1082,23 +1107,23 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                           : 'text-slate-600 hover:text-slateDark'
                       }`}
                     >
-                      <ImageIcon size={12} />
+                      <ImageIcon size={12} className="shrink-0" />
                       <span>Visual Slides</span>
                     </button>
                   </div>
 
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-heading font-black bg-yellowPop text-slateDark border border-slateDark">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-heading font-black bg-yellowPop text-slateDark border border-slateDark shrink-0">
                     {postResult.media_type}
                   </span>
                 </div>
 
                 {/* Media Container */}
-                <div className="relative rounded-2xl border-2 border-slateDark overflow-hidden bg-slate-50 shadow-pop-sm flex items-center justify-center min-h-[440px]">
+                <div className="relative rounded-2xl border-2 border-slateDark overflow-hidden bg-slate-50 shadow-pop-sm flex items-center justify-center min-h-[300px] sm:min-h-[440px] w-full">
                   {postPreviewMode === 'embed' && postResult.permalink ? (
                     <iframe
                       src={`${postResult.permalink.replace(/\/$/, '')}/embed/captioned/`}
                       title="Instagram Real Reel / Post Player"
-                      className="w-full min-h-[460px] h-full border-0 bg-white"
+                      className="w-full min-h-[340px] sm:min-h-[460px] h-full border-0 bg-white"
                       scrolling="no"
                       allowTransparency={true}
                     />
@@ -1150,7 +1175,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                 </div>
 
                 {/* Direct Action Links */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
                   {postResult.permalink && (
                     <a
                       href={postResult.permalink}
@@ -1159,7 +1184,7 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                       className="flex-1 py-2 px-3 rounded-xl border-2 border-slateDark bg-violetBrand text-white hover:bg-violet-700 transition-all font-heading font-black text-xs flex items-center justify-center gap-1.5 shadow-pop-sm"
                     >
                       <span>Open on Instagram</span>
-                      <ExternalLink size={12} />
+                      <ExternalLink size={12} className="shrink-0" />
                     </a>
                   )}
                   {postResult.author_name && (
@@ -1170,10 +1195,10 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                         setTargetUser(postResult.author_name!);
                         handleSearch(postResult.author_name!);
                       }}
-                      className="py-2 px-3 rounded-xl border-2 border-slateDark bg-mintPop text-slateDark hover:bg-emerald-300 transition-all font-heading font-black text-xs flex items-center gap-1 shadow-pop-sm"
+                      className="py-2 px-3 rounded-xl border-2 border-slateDark bg-mintPop text-slateDark hover:bg-emerald-300 transition-all font-heading font-black text-xs flex items-center justify-center gap-1 shadow-pop-sm"
                     >
-                      <span>@{postResult.author_name} Profile</span>
-                      <ArrowUpRight size={13} />
+                      <span className="truncate">@{postResult.author_name} Profile</span>
+                      <ArrowUpRight size={13} className="shrink-0" />
                     </button>
                   )}
                 </div>
@@ -1198,36 +1223,36 @@ export const BusinessDiscoveryView: React.FC<BusinessDiscoveryViewProps> = ({
                     </span>
                   </div>
 
-                  <h2 className="font-heading text-xl font-black text-slateDark leading-snug">
+                  <h2 className="font-heading text-lg sm:text-xl font-black text-slateDark leading-snug break-words">
                     "{postResult.mechanisms.hook}"
                   </h2>
                 </div>
 
                 {/* Metric Counters & Hook Rating */}
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="bg-rose-50 border-2 border-slateDark rounded-xl p-2.5 shadow-pop-sm">
-                    <span className="text-[10px] font-bold text-rose-600 uppercase flex items-center justify-center gap-1">
-                      <Heart size={11} fill="currentColor" /> Likes
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+                  <div className="bg-rose-50 border-2 border-slateDark rounded-xl p-2 sm:p-2.5 shadow-pop-sm min-w-0">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-rose-600 uppercase flex items-center justify-center gap-1 truncate">
+                      <Heart size={11} fill="currentColor" className="shrink-0" /> Likes
                     </span>
-                    <span className="font-heading text-base font-black text-slateDark">
+                    <span className="font-heading text-sm sm:text-base font-black text-slateDark block truncate">
                       {postResult.like_count ? postResult.like_count.toLocaleString() : 'Public'}
                     </span>
                   </div>
 
-                  <div className="bg-violet-50 border-2 border-slateDark rounded-xl p-2.5 shadow-pop-sm">
-                    <span className="text-[10px] font-bold text-violet-600 uppercase flex items-center justify-center gap-1">
-                      <MessageCircle size={11} /> Comments
+                  <div className="bg-violet-50 border-2 border-slateDark rounded-xl p-2 sm:p-2.5 shadow-pop-sm min-w-0">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-violet-600 uppercase flex items-center justify-center gap-1 truncate">
+                      <MessageCircle size={11} className="shrink-0" /> Comments
                     </span>
-                    <span className="font-heading text-base font-black text-slateDark">
+                    <span className="font-heading text-sm sm:text-base font-black text-slateDark block truncate">
                       {postResult.comments_count ? postResult.comments_count.toLocaleString() : 'Live'}
                     </span>
                   </div>
 
-                  <div className="bg-mintPop border-2 border-slateDark rounded-xl p-2.5 shadow-pop-sm">
-                    <span className="text-[10px] font-bold text-slateDark uppercase flex items-center justify-center gap-1">
-                      <Zap size={11} className="fill-current" /> Hook Score
+                  <div className="bg-mintPop border-2 border-slateDark rounded-xl p-2 sm:p-2.5 shadow-pop-sm min-w-0">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slateDark uppercase flex items-center justify-center gap-1 truncate">
+                      <Zap size={11} className="fill-current shrink-0" /> Score
                     </span>
-                    <span className="font-heading text-base font-black text-slateDark">
+                    <span className="font-heading text-sm sm:text-base font-black text-slateDark block truncate">
                       {postResult.mechanisms.hookScore} / 100
                     </span>
                   </div>

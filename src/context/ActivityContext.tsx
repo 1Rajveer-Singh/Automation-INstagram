@@ -92,29 +92,30 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   return (
     <ActivityContext.Provider value={{ activities, flashCard, addActivity, showFlashCard, clearActivities, setUserScope }}>
       {children}
-      {/* Global Animated Flash Card / Toast Component */}
+      {/* Global Animated Flash Card / Toast Component (Mobile-Responsive) */}
       {flashCard && (
-        <div className="fixed top-5 right-5 z-50 animate-pop-in max-w-md w-full p-4 bg-white border-4 border-slateDark rounded-2xl shadow-pop-lg flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="fixed top-3 inset-x-3 sm:inset-x-auto sm:top-5 sm:right-5 sm:w-full sm:max-w-md z-50 animate-pop-in p-3 sm:p-4 bg-white border-3 sm:border-4 border-slateDark rounded-2xl shadow-[4px_4px_0_#1E293B] sm:shadow-pop-lg flex items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             <div className={`p-2 rounded-xl border-2 border-slateDark shrink-0 ${
               flashCard.type === 'success' ? 'bg-emerald-200 text-emerald-900' :
               flashCard.type === 'error' ? 'bg-rose-200 text-rose-900' :
               'bg-violet-200 text-violet-900'
             }`}>
-              {flashCard.type === 'success' && <CheckCircle2 size={20} />}
-              {flashCard.type === 'error' && <AlertCircle size={20} />}
-              {flashCard.type === 'info' && <Sparkles size={20} />}
+              {flashCard.type === 'success' && <CheckCircle2 size={18} className="sm:w-5 sm:h-5" />}
+              {flashCard.type === 'error' && <AlertCircle size={18} className="sm:w-5 sm:h-5" />}
+              {flashCard.type === 'info' && <Sparkles size={18} className="sm:w-5 sm:h-5" />}
             </div>
-            <div>
-              <h4 className="font-heading text-xs font-black text-slateDark uppercase tracking-wider">
+            <div className="min-w-0 flex-1">
+              <h4 className="font-heading text-[10px] sm:text-xs font-black text-slateDark uppercase tracking-wider">
                 {flashCard.type === 'success' ? 'Success Flash' : flashCard.type === 'error' ? 'Alert Flash' : 'System Activity'}
               </h4>
-              <p className="text-xs font-semibold text-slate-700 mt-0.5">{flashCard.title}</p>
+              <p className="text-xs font-semibold text-slate-700 mt-0.5 break-words line-clamp-2 leading-tight">{flashCard.title}</p>
             </div>
           </div>
           <button
             onClick={() => setFlashCard(null)}
-            className="p-1 text-slate-400 hover:text-slateDark rounded-lg border border-transparent hover:border-slateDark"
+            className="p-1.5 text-slate-400 hover:text-slateDark rounded-lg border border-transparent hover:border-slateDark shrink-0 touch-manipulation cursor-pointer"
+            aria-label="Close notification"
           >
             <X size={16} />
           </button>

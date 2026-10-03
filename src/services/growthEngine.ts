@@ -9,6 +9,9 @@ import {
   WeeklyExperiment,
   ProfileTimezoneInfo,
   BusinessDiscoveryResult,
+  FreshAccountSettingRecommendation,
+  BioBlueprint,
+  FormatMix,
 } from '../types/instagram';
 import { GEMINI_MODEL_FALLBACKS } from './aiService';
 import { loadEnvCredentials, getScopedKey } from './security';
@@ -673,6 +676,10 @@ Respond ONLY with a valid JSON object strictly matching this schema:
       "pillar": "${niche} Step-by-Step Guides",
       "postTopic": "The 3-Step Strategy to Scale Results in ${niche}",
       "visualFormat": "Reel",
+      "ideaCategory": "Reel",
+      "targetDuration": "7–15 seconds",
+      "timelineScenes": "Scene 1 (0-3s): Hook text & visual pattern interrupt\\nScene 2 (3-8s): Problem teardown or practical 3-step value\\nScene 3 (8-12s): DM keyword trigger CTA",
+      "fullScript": "[Hook - 0s]: Stop making this costly mistake if you want to grow in ${niche}...\\n[Body - 3s]: When you optimize for audience search intent, organic reach multiplies.\\n[CTA - 9s]: Drop 'GUIDE' below and I'll DM you our full implementation checklist!",
       "hook": "Stop making this costly mistake if you want to grow in ${niche}:",
       "captionAndCta": "Stop making this costly mistake if you want to grow in ${niche}:\\n\\nMost people overlook the fundamentals when approaching ${niche}. When you optimize your positioning for user search intent, organic reach multiplies.\\n\\nKey SEO Levers:\\n• High-intent audience search alignment\\n• Retention optimization\\n• Consistent execution\\n\\n👉 Share this with someone building in ${niche}!\\n\\n💬 Drop 'GUIDE' below and I will send you our full implementation checklist straight to your DMs!\\n\\n#${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'} #${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'}tips #${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'}strategy",
       "seoKeywordsAndTags": "#${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'} #${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'}tips #${niche.split(/\\s+/)[0]?.toLowerCase() || 'growth'}strategy",
@@ -698,8 +705,24 @@ Respond ONLY with a valid JSON object strictly matching this schema:
     "Update bio: Replace generic slogan with 1-sentence value proposition + DM keyword CTA",
     "Pin top 3 highest-value Reels/Carousels representing your Authority and Discovery pillars",
     "Setup 'GROW' or 'GUIDE' comment auto-responder rule for Day 1 launch post"
-  ]
+  ],
+  "freshAccountSettings": [
+    { "settingName": "Professional Creator/Business Account", "recommendedValue": "Creator or Business Mode", "inAppPath": "Settings and activity > Account type and tools > Switch to professional account", "reason": "Required for Instagram Graph API webhooks, comment automation, and deep demographic analytics." },
+    { "settingName": "High Quality Uploads", "recommendedValue": "Upload at highest quality: ON", "inAppPath": "Settings and activity > Data usage and media quality > Upload at highest quality", "reason": "Prevents Instagram from lowering 1080p/4K Reels into pixelated 480p on cellular networks." },
+    { "settingName": "Message Request Controls", "recommendedValue": "Allow message requests from everyone: ON", "inAppPath": "Settings and activity > How others can interact with you > Messages and story replies > Message controls", "reason": "Allows your Graph API automated DM delivery funnels to reach non-followers without landing in hidden spam." },
+    { "settingName": "Hidden Words & Keyword Shield", "recommendedValue": "Custom words and phrases for keyword triggers", "inAppPath": "Settings and activity > How others can interact with you > Hidden words", "reason": "Blocks toxic bot spam while alerting you to high-intent buyer keywords in comments." }
+  ],
+  "bioBlueprint": {
+    "nameLine": "${username ? '@' + username : 'Your Brand'} | ${niche.slice(0, 20)} Specialist",
+    "category": "Entrepreneur & Creator",
+    "transformationHook": "Helping ${targetAudience} achieve high-retention results in ${niche}.",
+    "socialProof": "100% data-driven • Tested frameworks • Weekly case studies",
+    "callToAction": "👇 Drop 'GROW' on my latest post or DM me 'START' to unlock the free blueprint",
+    "linkInBioTip": "Use 1 direct conversion link (or DM funnel) instead of cluttered linktrees to maximize conversion."
+  }
 };`;
+
+  const minExpectedPosts = Math.min(3, totalTargetInFeed, targetDays);
 
   // 1. Primary Engine: Google Gemini API (High-Performance Reasoning & Calendar Intelligence)
   if (effectiveGeminiKey) {
@@ -735,8 +758,8 @@ Respond ONLY with a valid JSON object strictly matching this schema:
             const match = rawText.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
-              if (parsed.calendar && Array.isArray(parsed.calendar) && parsed.calendar.length >= 7) {
-                const completeCalendar = ensureFullCalendar(parsed.calendar, niche, tzInfo.standardCode, targetDays);
+              if (parsed.calendar && Array.isArray(parsed.calendar) && parsed.calendar.length >= minExpectedPosts) {
+                const completeCalendar = ensureFullCalendar(parsed.calendar, niche, tzInfo.standardCode, targetDays, totalTargetInFeed, userMix);
                 console.info(`[AI Success] Generated full strategy plan with Gemini model: ${modelName}`);
                 return {
                   accountUsername: username,
@@ -744,6 +767,8 @@ Respond ONLY with a valid JSON object strictly matching this schema:
                   engagementRate: engRate,
                   subNiche: niche,
                   timeZoneInfo: tzInfo,
+                  freshAccountSettings: parsed.freshAccountSettings || getFreshAccountRecommendations(niche),
+                  bioBlueprint: parsed.bioBlueprint || getBioBlueprint(niche, targetAudience, username),
                   ...parsed,
                   calendar: completeCalendar,
                   isAiGenerated: true,
@@ -798,8 +823,8 @@ Respond ONLY with a valid JSON object strictly matching this schema:
             const match = rawText.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
-              if (parsed.calendar && Array.isArray(parsed.calendar) && parsed.calendar.length >= 7) {
-                const completeCalendar = ensureFullCalendar(parsed.calendar, niche, tzInfo.standardCode, targetDays);
+              if (parsed.calendar && Array.isArray(parsed.calendar) && parsed.calendar.length >= minExpectedPosts) {
+                const completeCalendar = ensureFullCalendar(parsed.calendar, niche, tzInfo.standardCode, targetDays, totalTargetInFeed, userMix);
                 console.info(`[AI Success] Generated calendar via OpenRouter model: ${orModel}`);
                 return {
                   accountUsername: username,
@@ -807,6 +832,8 @@ Respond ONLY with a valid JSON object strictly matching this schema:
                   engagementRate: engRate,
                   subNiche: niche,
                   timeZoneInfo: tzInfo,
+                  freshAccountSettings: parsed.freshAccountSettings || getFreshAccountRecommendations(niche),
+                  bioBlueprint: parsed.bioBlueprint || getBioBlueprint(niche, targetAudience, username),
                   ...parsed,
                   calendar: completeCalendar,
                   isAiGenerated: true,
@@ -1061,60 +1088,199 @@ export function getNicheAwarePillarBlueprint(
 }
 
 /**
- * Fills or constructs a full calendar array ensuring exactly targetDays items
+ * Fresh account initial settings recommendations for Instagram in-app configuration
+ */
+export function getFreshAccountRecommendations(niche: string): FreshAccountSettingRecommendation[] {
+  return [
+    {
+      settingName: 'Professional Creator/Business Account',
+      recommendedValue: 'Creator or Business Mode',
+      inAppPath: 'Settings and activity > Account type and tools > Switch to professional account',
+      reason: 'Mandatory for Instagram Graph API webhooks, comment automation, and deep demographic analytics.',
+    },
+    {
+      settingName: 'High Quality Uploads',
+      recommendedValue: 'Upload at highest quality: ON',
+      inAppPath: 'Settings and activity > Data usage and media quality > Upload at highest quality',
+      reason: 'Prevents Instagram from lowering 1080p/4K Reels into pixelated 480p on cellular networks.',
+    },
+    {
+      settingName: 'Message Request Controls',
+      recommendedValue: 'Allow message requests from everyone: ON',
+      inAppPath: 'Settings and activity > How others can interact with you > Messages and story replies > Message controls',
+      reason: 'Allows your Graph API automated DM delivery funnels to reach non-followers without landing in hidden spam.',
+    },
+    {
+      settingName: 'Hidden Words & Keyword Shield',
+      recommendedValue: 'Custom words and phrases for keyword triggers',
+      inAppPath: 'Settings and activity > How others can interact with you > Hidden words',
+      reason: 'Blocks toxic bot spam while alerting you to high-intent buyer keywords in comments.',
+    },
+  ];
+}
+
+/**
+ * Generates an optimized Instagram bio blueprint based on sub-niche and audience
+ */
+export function getBioBlueprint(niche: string, targetAudience: string, username?: string): BioBlueprint {
+  const cleanNiche = (niche && niche.trim().length > 0) ? niche.trim() : 'Growth Specialist';
+  const cleanAudience = (targetAudience && targetAudience.trim().length > 0) ? targetAudience.trim() : 'ambitious creators and brands';
+  return {
+    nameLine: `${username ? '@' + username : 'Your Brand'} | ${cleanNiche.slice(0, 22)}`,
+    category: 'Entrepreneur & Creator',
+    transformationHook: `Helping ${cleanAudience} scale results with high-retention systems in ${cleanNiche}.`,
+    socialProof: `100% data-driven • Tested frameworks • Weekly case studies`,
+    callToAction: `👇 Comment 'GROW' on my latest post to receive the free breakdown`,
+    linkInBioTip: 'Keep a single conversion endpoint or direct DM trigger rather than confusing multi-link aggregators.',
+  };
+}
+
+/**
+ * Enriches a calendar item with production details: category, duration, scenes, and full script
+ */
+export function enrichCalendarItemWithRichIdeas(
+  item: GrowthCalendarItem,
+  niche: string,
+  dayNum: number
+): GrowthCalendarItem {
+  const isReel = item.visualFormat === 'Reel' || item.visualFormat === 'Video';
+  const isCarousel = item.visualFormat === 'Carousel';
+  const ideaCategory: 'Reel' | 'Post' | 'Carousel' | 'Story' = isReel ? 'Reel' : isCarousel ? 'Carousel' : 'Post';
+
+  const targetDuration = item.targetDuration || (isReel ? '7–15 seconds' : isCarousel ? '6–8 slides' : 'Single frame post');
+
+  const cleanNiche = (niche && niche.trim().length > 0) ? niche.trim() : 'your industry';
+  const hookText = item.hook || `Stop making this costly mistake in ${cleanNiche}`;
+
+  const timelineScenes = item.timelineScenes || (isReel ?
+    `Scene 1 (0-3s): [Hook] "${hookText}" with fast-paced visual pattern interrupt\\nScene 2 (3-8s): [Core Value] Show the breakdown or contrarian insight solving the problem\\nScene 3 (8-12s): [CTA] Direct viewer to drop keyword below to get the free checklist straight to DMs` :
+    isCarousel ?
+    `Slide 1: Hook headline & curiosity tension\\nSlides 2-4: 3-step practical execution framework\\nSlide 5: Common pitfall debunked\\nSlide 6: Summary & Save/DM call-to-action` :
+    `Frame 1: High-contrast statement graphic\\nCaption: Deep-dive breakdown and DM conversation prompt`
+  );
+
+  const fullScript = item.fullScript || (isReel ?
+    `[Hook - 0s]: "${hookText}"\\n[Body - 3s]: "If you want to scale in ${cleanNiche}, stop overcomplicating your process. Most people fail because they lack consistency and clear messaging."\\n[CTA - 9s]: "Drop 'GROW' below and I'll send you our complete step-by-step breakdown straight to your DMs!"` :
+    `[Headline]: "${hookText}"\\n[Key Points]: Deconstructing the core framework for ${cleanNiche}.\\n[Call to Action]: Share this with someone in ${cleanNiche} and drop a comment below.`
+  );
+
+  return {
+    ...item,
+    ideaCategory: item.ideaCategory || ideaCategory,
+    targetDuration,
+    timelineScenes,
+    fullScript,
+  };
+}
+
+/**
+ * Fills or constructs a full calendar array ensuring the target posts and formats are scheduled
  */
 function ensureFullCalendar(
   items: GrowthCalendarItem[],
   niche: string,
   timeZoneCode: string = 'UTC',
-  targetDays: number = 30
+  targetDays: number = 30,
+  totalTargetPosts: number = 30,
+  targetMix?: FormatMix | { reels?: number; carousels?: number; videos?: number; singlePosts?: number; stories?: number }
 ): GrowthCalendarItem[] {
-  const result: GrowthCalendarItem[] = [...items];
+  let result: GrowthCalendarItem[] = [...items];
   const nichePillars = getNichePillars(niche);
+  const targetCount = Math.max(1, totalTargetPosts);
 
-  for (let d = result.length + 1; d <= targetDays; d++) {
-    const pillarObj = nichePillars[(d - 1) % nichePillars.length];
-    const bp = getNicheAwarePillarBlueprint(pillarObj.name, niche, '', d);
-    const timeSlotHour = d % 2 === 0 ? '18:00' : '20:30';
-    const timeSlot = `${timeSlotHour} ${timeZoneCode}`;
-    const postDate = new Date(Date.now() + 86400000 * d);
-    const dateStr = postDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-    const dayOfWeek = postDate.toLocaleDateString('en-US', { weekday: 'long' });
-    const scheduledAt = `${postDate.toISOString().slice(0, 10)}T${timeSlotHour}:00`;
-
-    const nicheTag = (niche || 'growth').split(/[\s,]+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '') || 'growth';
-
-    result.push({
-      day: d,
-      dayLabel: `Day ${d}`,
-      dateStr,
-      dayOfWeek,
-      timeSlot,
-      timeStr: timeSlotHour,
-      platform: 'Instagram',
-      status: 'Planned',
-      pillar: bp.pillar,
-      postTopic: bp.topic,
-      visualFormat: bp.fmt,
-      imageUrl: '',
-      carouselMedia: '',
-      coverUrl: '',
-      hook: bp.hook,
-      captionAndCta: ensureCaptionHasHookSeoAndTags(bp.caption, bp.hook, bp.seoTags, niche),
-      seoKeywordsAndTags: bp.seoTags,
-      locationName: 'Explore Feed',
-      scheduledAt,
-      altText: `${bp.fmt} - ${bp.topic}`,
-      song: bp.fmt === 'Reel' ? 'Trending Audio - High Retention Beat' : '',
-      tag: `@${nicheTag}_insights`,
-      competitorDiscovery: '',
-      link: '',
-    });
+  // If AI generated more than targetCount, slice to targetCount
+  if (result.length > targetCount) {
+    result = result.slice(0, targetCount);
   }
-  return result.map(item => ({
-    ...item,
-    captionAndCta: ensureCaptionHasHookSeoAndTags(item.captionAndCta, item.hook, item.seoKeywordsAndTags, niche),
-  }));
+
+  // Ensure day numbers don't exceed targetDays
+  result = result.map((item, idx) => {
+    const day = Math.min(targetDays, Math.max(1, item.day || Math.round(((idx) / targetCount) * targetDays) + 1));
+    return { ...item, day };
+  });
+
+  // Pad missing posts up to targetCount if AI returned fewer than requested
+  if (result.length < targetCount) {
+    for (let i = result.length + 1; i <= targetCount; i++) {
+      const d = Math.min(targetDays, Math.max(1, Math.round(((i - 1) / targetCount) * targetDays) + 1));
+      const pillarObj = nichePillars[(i - 1) % nichePillars.length];
+      const bp = getNicheAwarePillarBlueprint(pillarObj.name, niche, '', d);
+      const timeSlotHour = i % 2 === 0 ? '18:00' : '20:30';
+      const timeSlot = `${timeSlotHour} ${timeZoneCode}`;
+      const postDate = new Date(Date.now() + 86400000 * d);
+      const dateStr = postDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      const dayOfWeek = postDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const scheduledAt = `${postDate.toISOString().slice(0, 10)}T${timeSlotHour}:00`;
+
+      const nicheTag = (niche || 'growth').split(/[\s,]+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '') || 'growth';
+
+      result.push({
+        day: d,
+        dayLabel: targetCount > targetDays ? `Day ${d} (Slot ${i})` : `Day ${d}`,
+        dateStr,
+        dayOfWeek,
+        timeSlot,
+        timeStr: timeSlotHour,
+        platform: 'Instagram',
+        status: 'Planned',
+        pillar: bp.pillar,
+        postTopic: bp.topic,
+        visualFormat: bp.fmt,
+        imageUrl: '',
+        carouselMedia: '',
+        coverUrl: '',
+        hook: bp.hook,
+        captionAndCta: ensureCaptionHasHookSeoAndTags(bp.caption, bp.hook, bp.seoTags, niche),
+        seoKeywordsAndTags: bp.seoTags,
+        locationName: 'Explore Feed',
+        scheduledAt,
+        altText: `${bp.fmt} - ${bp.topic}`,
+        song: bp.fmt === 'Reel' ? 'Trending Audio - High Retention Beat' : '',
+        tag: `@${nicheTag}_insights`,
+        competitorDiscovery: '',
+        link: '',
+      });
+    }
+  }
+
+  // If targetMix is specified, enforce the visual formats onto the calendar items
+  if (targetMix) {
+    const reelsPool = Array(targetMix.reels ?? 0).fill('Reel' as const);
+    const carouselsPool = Array(targetMix.carousels ?? 0).fill('Carousel' as const);
+    const videosPool = Array(targetMix.videos ?? 0).fill('Video' as const);
+    const singlesPool = Array(targetMix.singlePosts ?? 0).fill('Single Post' as const);
+
+    const formatSchedule: Array<'Reel' | 'Carousel' | 'Video' | 'Single Post'> = [];
+    for (let i = 0; i < result.length; i++) {
+      if (i % 2 === 0 && reelsPool.length > 0) {
+        formatSchedule.push(reelsPool.pop()!);
+      } else if (carouselsPool.length > 0) {
+        formatSchedule.push(carouselsPool.pop()!);
+      } else if (videosPool.length > 0) {
+        formatSchedule.push(videosPool.pop()!);
+      } else if (singlesPool.length > 0) {
+        formatSchedule.push(singlesPool.pop()!);
+      } else if (reelsPool.length > 0) {
+        formatSchedule.push(reelsPool.pop()!);
+      } else {
+        formatSchedule.push('Reel');
+      }
+    }
+
+    result = result.map((item, idx) => ({
+      ...item,
+      visualFormat: formatSchedule[idx] || item.visualFormat || 'Reel',
+    }));
+  }
+
+  // Enrich all items with rich idea breakdown, duration, scenes, and full script
+  return result.map((item, idx) => {
+    const enriched = enrichCalendarItemWithRichIdeas(item, niche, item.day || (idx + 1));
+    return {
+      ...enriched,
+      captionAndCta: ensureCaptionHasHookSeoAndTags(enriched.captionAndCta, enriched.hook, enriched.seoKeywordsAndTags, niche),
+    };
+  });
 }
 
 /**
@@ -1230,7 +1396,7 @@ function buildDeterministicGrowthPlan(
     const dayOfWeek = postDate.toLocaleDateString('en-US', { weekday: 'long' });
     const scheduledAt = `${postDate.toISOString().slice(0, 10)}T${timeSlotHour.padStart(5, '0')}:00`;
 
-    return {
+    const calendarItem: GrowthCalendarItem = {
       day,
       dayLabel,
       dateStr,
@@ -1256,6 +1422,7 @@ function buildDeterministicGrowthPlan(
       competitorDiscovery: '',
       link: '',
     };
+    return enrichCalendarItemWithRichIdeas(calendarItem, niche, day);
   });
 
   const weeklySprints: WeeklyExperiment[] = [
@@ -1299,6 +1466,8 @@ function buildDeterministicGrowthPlan(
     engagementRate: engRate,
     subNiche: niche,
     timeZoneInfo: tzInfo,
+    freshAccountSettings: getFreshAccountRecommendations(niche),
+    bioBlueprint: getBioBlueprint(niche, targetAudience, username),
     growthScore: {
       total,
       contentQuality,
@@ -1347,10 +1516,11 @@ function buildDeterministicGrowthPlan(
  */
 export function recalculateCalendarWithTargetMix(
   currentCalendar: GrowthCalendarItem[],
-  targetMix: { reels: number; carousels: number; videos: number; singlePosts: number; stories?: number },
+  targetMix: FormatMix | { reels?: number; carousels?: number; videos?: number; singlePosts?: number; stories?: number },
   targetDays: number,
   tzStandardCode: string = 'UTC',
-  rawCompetitors: string[] = []
+  rawCompetitors: string[] = [],
+  niche: string = 'Growth Strategy'
 ): GrowthCalendarItem[] {
   const targetReels = targetMix.reels ?? 15;
   const targetCarousels = targetMix.carousels ?? 10;
@@ -1405,13 +1575,13 @@ export function recalculateCalendarWithTargetMix(
 
   const fallbackPillars = currentCalendar.length > 0
     ? Array.from(new Set(currentCalendar.map(c => c.pillar).filter(Boolean)))
-    : getNichePillars('Growth Strategy').map(p => p.name);
+    : getNichePillars(niche).map(p => p.name);
 
   return dayAllocations.map((alloc, idx) => {
     const { day, slotIndex, totalSlotsForDay } = alloc;
     const existing = currentCalendar.find(c => c.day === day && (totalSlotsForDay === 1 || c.dayLabel.includes(`Slot ${slotIndex}`)));
-    const pillarName = existing?.pillar || fallbackPillars[(day - 1) % fallbackPillars.length] || 'Growth Strategy';
-    const bp = getNicheAwarePillarBlueprint(pillarName, 'Growth Strategy', '', day);
+    const pillarName = existing?.pillar || fallbackPillars[(day - 1) % fallbackPillars.length] || `${niche} Strategy`;
+    const bp = getNicheAwarePillarBlueprint(pillarName, niche, '', day);
     const format = formatSchedule[idx] || bp.fmt || 'Reel';
 
     const dayLabel = totalSlotsForDay > 1 ? `Day ${day} (Slot ${slotIndex})` : `Day ${day}`;
@@ -1433,7 +1603,7 @@ export function recalculateCalendarWithTargetMix(
     const dayOfWeek = postDate.toLocaleDateString('en-US', { weekday: 'long' });
     const scheduledAt = `${postDate.toISOString().slice(0, 10)}T${timeSlotHour.padStart(5, '0')}:00`;
 
-    return {
+    const recalculatedItem: GrowthCalendarItem = {
       day,
       dayLabel,
       dateStr,
@@ -1464,6 +1634,7 @@ export function recalculateCalendarWithTargetMix(
       competitorDiscovery: '',
       link: '',
     };
+    return enrichCalendarItemWithRichIdeas(recalculatedItem, 'Growth Strategy', day);
   });
 }
 
@@ -1673,9 +1844,15 @@ export function exportCalendarToCsv(calendar: GrowthCalendarItem[], niche?: stri
     'Content Pillar',
     'Post Topic',
     'Visual Type',
+    'Category',
+    'Target Duration',
+    'Timeline Scenes',
+    'Full Script',
+    'Hook',
     'Media URL',
     'Cover URL',
     'Caption',
+    'SEO Keywords & Tags',
   ];
 
   const escapeCsv = (val: any) => {
@@ -1693,9 +1870,15 @@ export function exportCalendarToCsv(calendar: GrowthCalendarItem[], niche?: stri
     const pillar = item.pillar || '';
     const postTopic = item.postTopic || '';
     const visualFormat = item.visualFormat || '';
+    const category = item.ideaCategory || item.visualFormat || '';
+    const targetDuration = item.targetDuration || '';
+    const timelineScenes = item.timelineScenes || '';
+    const fullScript = item.fullScript || '';
+    const hook = item.hook || '';
     const imageUrl = item.imageUrl || '';
     const coverUrl = item.coverUrl || '';
     const caption = ensureCaptionHasHookSeoAndTags(item.captionAndCta, item.hook, item.seoKeywordsAndTags, niche);
+    const seoTags = item.seoKeywordsAndTags || '';
 
     return [
       escapeCsv(dateStr),
@@ -1706,9 +1889,15 @@ export function exportCalendarToCsv(calendar: GrowthCalendarItem[], niche?: stri
       escapeCsv(pillar),
       escapeCsv(postTopic),
       escapeCsv(visualFormat),
+      escapeCsv(category),
+      escapeCsv(targetDuration),
+      escapeCsv(timelineScenes),
+      escapeCsv(fullScript),
+      escapeCsv(hook),
       escapeCsv(imageUrl),
       escapeCsv(coverUrl),
       escapeCsv(caption),
+      escapeCsv(seoTags),
     ].join(',');
   });
 

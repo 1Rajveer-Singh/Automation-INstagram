@@ -532,6 +532,22 @@ export async function logSupabaseCommentReply(userId: string, log: Omit<DbCommen
   }
 }
 
+export async function fetchSupabaseCommentLogs(userId: string, limit = 50): Promise<DbCommentLog[]> {
+  if (!supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('comment_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error || !data) return [];
+    return data as DbCommentLog[];
+  } catch {
+    return [];
+  }
+}
+
 // ============================================================================
 // 6. Hashtag Bank (Per Clerk userId)
 // ============================================================================

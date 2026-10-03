@@ -35,20 +35,20 @@ export const HashtagGeneratorView: React.FC<HashtagGeneratorViewProps> = ({
     artisan: {
       niche: 'Artisan & Handcrafted Studio',
       lowCompetition: ['#artisanpottery', '#handcraftedceramics', '#studiopotter', '#modernceramic', '#ceramicartisan'],
-      mediumReach: ['#artisan', '#handcrafted', '#potterystudio', '#ceramicart', '#studioart'],
-      highReach: ['#art', '#design', '#handmade', '#homedecor', '#artist'],
+      mediumReach: ['#ceramicstudio', '#handmadepottery', '#claywork', '#potterylife', '#stonewareceramics'],
+      highReach: ['#ceramicart', '#functionalpottery', '#wheelthrown', '#clayartist', '#contemporaryceramics'],
     },
     fitness: {
       niche: 'Fitness & Health Growth',
-      lowCompetition: ['#homefitnesstips', '#dailyworkoutroutine', '#beginnerfitnessjourney', '#fitspirationdaily'],
-      mediumReach: ['#fitnessgoals', '#workoutmotivation', '#gymlife', '#fitnesstips'],
-      highReach: ['#fitness', '#gym', '#workout', '#health', '#fit'],
+      lowCompetition: ['#homefitnesstips', '#dailyworkoutroutine', '#beginnerfitnessjourney', '#strengthform'],
+      mediumReach: ['#strengthtrainingtips', '#fitnesstipsdaily', '#hypertrophytraining', '#functionalstrength'],
+      highReach: ['#workoutprogramming', '#exerciseform', '#fitnesstraining', '#strengthandconditioning', '#mindmuscleconnection'],
     },
     fashion: {
       niche: 'Aesthetic Fashion & Style',
       lowCompetition: ['#minimalistoutfitinspo', '#streetwearaesthetic', '#capsulewardrobe', '#dailyoutfitideas'],
-      mediumReach: ['#fashioninspo', '#stylegram', '#outfitoftheday', '#streetstyle'],
-      highReach: ['#fashion', '#style', '#ootd', '#love', '#model'],
+      mediumReach: ['#sustainablewardrobe', '#transitionaloutfits', '#minimalistfashioninspo', '#smartcasualstyle'],
+      highReach: ['#capsulestyle', '#outfitinspoideas', '#streetwearculture', '#classicmenswear', '#timelesswardrobe'],
     },
   };
 
@@ -64,18 +64,39 @@ export const HashtagGeneratorView: React.FC<HashtagGeneratorViewProps> = ({
       `#${clean}hub`,
     ],
     mediumReach: [
-      `#${clean}`,
-      `#${clean}life`,
-      `#${clean}inspo`,
       `#${clean}creator`,
-      `#${clean}style`,
+      `#${clean}strategy`,
+      `#${clean}insights`,
+      `#${clean}content`,
+      `#${clean}studio`,
     ],
-    highReach: ['#viral', '#trending', '#explore', '#reels', '#growth'],
+    highReach: [
+      `#${clean}industry`,
+      `#${clean}business`,
+      `#${clean}growth`,
+      `#${clean}mastery`,
+      `#${clean}method`,
+    ],
   };
+
+  // Meta 2025/2026 standard: Best 3-5 hyper-targeted tags
+  const recommendedMetaTags = [
+    currentSet.lowCompetition[0],
+    currentSet.lowCompetition[1] || currentSet.lowCompetition[0],
+    currentSet.mediumReach[0],
+    currentSet.mediumReach[1] || currentSet.mediumReach[0],
+    currentSet.highReach[0],
+  ].filter(Boolean).slice(0, 5);
 
   const handleCopySet = (tags: string[], label: string) => {
     navigator.clipboard.writeText(tags.join(' '));
     setCopiedSection(label);
+    setTimeout(() => setCopiedSection(null), 2000);
+  };
+
+  const copyRecommendedMetaTags = () => {
+    navigator.clipboard.writeText(recommendedMetaTags.join(' '));
+    setCopiedSection('META');
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
@@ -88,17 +109,34 @@ export const HashtagGeneratorView: React.FC<HashtagGeneratorViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Meta 2025/2026 Policy Notice */}
+      <div className="p-3.5 bg-gradient-to-r from-violet-50 to-blue-50 border-2 border-violet-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-700">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded-full bg-violet-600 text-white font-extrabold text-[10px] uppercase tracking-wider shrink-0">
+            Meta 2025/2026 Standard
+          </span>
+          <p className="font-medium text-slate-700">
+            Instagram algorithm prioritizes <strong>3–5 hyper-relevant niche tags</strong> + descriptive in-caption SEO. Generic tags (<code className="text-rose-600">#viral</code>, <code className="text-rose-600">#fyp</code>) are penalized as low-quality spam.
+          </p>
+        </div>
+        <CandyButton variant="pink" size="sm" onClick={copyRecommendedMetaTags} icon={Copy} className="shrink-0 text-xs">
+          {copiedSection === 'META' ? 'Copied 3–5 Meta Tags!' : 'Copy 3–5 Meta Tags'}
+        </CandyButton>
+      </div>
+
       {/* Header */}
       <StickerCard
         title="High-Reach Niche Hashtag Generator & Ranker"
-        subtitle="Optimized 3-Tier Hashtag Matrix designed to rank lower-popularity accounts on Instagram Explore"
+        subtitle="Optimized 3-Tier Hashtag Matrix strictly aligned with Meta Search & Explore indexing"
         icon={Hash}
         iconBgColor="bg-yellowPop text-slateDark"
         shadowColor="yellow"
         headerAction={
-          <CandyButton variant="pink" size="sm" onClick={copyAllCombined} icon={Copy}>
-            {copiedSection === 'ALL' ? 'Copied 15 Tags!' : 'Copy 15-Tag Mix'}
-          </CandyButton>
+          <div className="flex items-center gap-2">
+            <CandyButton variant="yellow" size="sm" onClick={copyRecommendedMetaTags} icon={Copy}>
+              {copiedSection === 'META' ? 'Copied Meta Tags!' : 'Copy 3-5 Best Tags'}
+            </CandyButton>
+          </div>
         }
       >
         <div className="flex flex-col sm:flex-row items-end gap-3 max-w-xl">

@@ -117,6 +117,7 @@ export function App() {
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [hashtagSubTab, setHashtagSubTab] = useState<'generator' | 'scanner'>('generator');
+  const [growthAutoSubTab, setGrowthAutoSubTab] = useState<'diagnosis' | 'calendar' | 'actions'>('calendar');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<InstagramUser | null>(null);
   const [media, setMedia] = useState<InstagramMedia[]>([]);
@@ -136,7 +137,7 @@ export function App() {
 
   const handleSaveStrategy = (
     profile: GrowthStrategyProfile,
-    targetTab?: 'competitors' | 'hashtag-generator' | 'hashtags'
+    targetTab?: 'competitors' | 'hashtag-generator' | 'hashtags' | 'calendar'
   ) => {
     setStrategyProfile(profile);
     localStorage.setItem(strategyKey, JSON.stringify(profile));
@@ -162,8 +163,11 @@ export function App() {
     } else if (targetTab === 'hashtags') {
       setActiveTab('hashtags');
       setHashtagSubTab('scanner');
+    } else if (targetTab === 'calendar') {
+      setActiveTab('growth-rules');
+      setGrowthAutoSubTab('calendar');
     } else if (targetTab) {
-      setActiveTab(targetTab);
+      setActiveTab(targetTab as any);
     }
   };
 
@@ -370,6 +374,8 @@ export function App() {
                     onNavigate={handleNavigate}
                     onOpenStrategyModal={() => setIsStrategyModalOpen(true)}
                     userId={activeUserId}
+                    activeSubTab={growthAutoSubTab}
+                    onSubTabChange={setGrowthAutoSubTab}
                   />
                 </div>
 

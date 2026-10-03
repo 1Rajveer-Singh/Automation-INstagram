@@ -497,17 +497,32 @@ export async function replyToComment(
 ): Promise<{ id: string }> {
   if (!token) throw new Error('Access Token required');
 
-  // Try official /{comment-id}/replies endpoint first
+  // Try 1: URLSearchParams form-encoded POST (Official Graph API standard)
+  try {
+    const bodyParams = new URLSearchParams({
+      message,
+      access_token: token,
+    });
+    const res = await fetch(`${GRAPH_API_BASE}/${commentId}/replies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: bodyParams.toString(),
+    });
+    const json = await res.json();
+    if (json.id) return json;
+  } catch {}
+
+  // Try 2: URL query parameter endpoint
   const repliesUrl = `${GRAPH_API_BASE}/${commentId}/replies?message=${encodeURIComponent(message)}&access_token=${encodeURIComponent(token)}`;
   let res = await fetch(repliesUrl, { method: 'POST' });
   let json = await res.json();
+  if (json.id) return json;
 
-  if (json.error) {
-    // Try fallback /{comment-id}/comments endpoint
-    const fallbackUrl = `${GRAPH_API_BASE}/${commentId}/comments?message=${encodeURIComponent(message)}&access_token=${encodeURIComponent(token)}`;
-    res = await fetch(fallbackUrl, { method: 'POST' });
-    json = await res.json();
-  }
+  // Try 3: Fallback /{comment-id}/comments endpoint
+  const fallbackUrl = `${GRAPH_API_BASE}/${commentId}/comments?message=${encodeURIComponent(message)}&access_token=${encodeURIComponent(token)}`;
+  res = await fetch(fallbackUrl, { method: 'POST' });
+  json = await res.json();
+  if (json.id) return json;
 
   if (json.error) {
     console.warn(`Meta Graph API comment reply notice for ${commentId}:`, json.error.message);
@@ -1356,3 +1371,70 @@ export async function updateMediaCaption(
     };
   }
 }
+
+/**
+ * Subscribe Instagram Business Account / Page to Meta Real-Time Webhooks
+ * Required by Meta Graph API v22.0 to receive comment webhooks without polling or open browsers
+ */
+export async function subscribeToMetaWebhooks(
+  targetId: string,
+  accessToken: string
+): Promise<{ success: boolean; message: string }> {
+  if (!targetId || !accessToken) {
+    return { success: false, message: 'Account ID and Access Token are required to subscribe.' };
+  }
+
+  try {
+    // 1. Subscribe Instagram Account for comment events
+    const igUrl = `${GRAPH_API_BASE}/${targetId}/subscribed_apps`;
+    const params = new URLSearchParams({
+      subscribed_fields: 'comments,feed',
+      access_token: accessToken,
+    });
+
+    const res = await fetch(igUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      return { success: true, message: `Successfully subscribed account ${targetId} to Meta real-time webhooks!` };
+    }
+
+    // 2. Query connected Facebook Pages and subscribe them
+    const mePagesRes = await fetch(`${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${encodeURIComponent(accessToken)}`);
+    const mePagesData = await mePagesRes.json();
+    if (mePagesData.data && Array.isArray(mePagesData.data)) {
+      for (const page of mePagesData.data) {
+        const pageToken = page.access_token || accessToken;
+        const pageSubUrl = `${GRAPH_API_BASE}/${page.id}/subscribed_apps`;
+        const pageParams = new URLSearchParams({
+          subscribed_fields: 'feed,comments',
+          access_token: pageToken,
+        });
+        const pageSubRes = await fetch(pageSubUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: pageParams.toString(),
+        });
+        const pageSubData = await pageSubRes.json();
+        if (pageSubData.success) {
+          return { success: true, message: `Successfully subscribed connected page "${page.name}" (${page.id}) to Meta real-time webhooks!` };
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: data.error?.message || 'Meta Webhook subscription registered.',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || 'Error subscribing account to Meta Webhooks',
+    };
+  }
+}
+

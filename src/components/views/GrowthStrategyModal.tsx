@@ -20,7 +20,7 @@ import {
 interface GrowthStrategyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveStrategy: (profile: GrowthStrategyProfile, targetTab?: 'competitors' | 'hashtag-generator' | 'hashtags') => void;
+  onSaveStrategy: (profile: GrowthStrategyProfile, targetTab?: 'competitors' | 'hashtag-generator' | 'hashtags' | 'calendar') => void;
   initialProfile?: GrowthStrategyProfile | null;
 }
 
@@ -86,7 +86,7 @@ export const GrowthStrategyModal: React.FC<GrowthStrategyModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSave = (jumpTo?: 'competitors' | 'hashtag-generator' | 'hashtags') => {
+  const handleSave = (jumpTo: 'competitors' | 'hashtag-generator' | 'hashtags' | 'calendar' = 'calendar') => {
     if (!subNiche.trim()) {
       setActiveStep(1);
       setErrorMsg('Please enter your specific sub-niche or core offer.');

@@ -1059,15 +1059,15 @@ export const PublisherView: React.FC<PublisherViewProps> = ({ config, onPostPubl
 
               {/* Media URL / Upload Image Switcher */}
               <div className="space-y-3 bg-slate-50 border-2 border-slateDark p-3.5 rounded-2xl">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <label className="font-heading text-xs font-bold uppercase tracking-wider text-slateDark">
                     {mediaType === 'IMAGE' || mediaType === 'CAROUSEL' ? 'Photo / Carousel Source' : 'Video / Reel Source'}
                   </label>
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slateDark shrink-0">
+                  <div className="grid grid-cols-2 sm:flex items-center gap-1 bg-white p-1 rounded-xl border border-slateDark w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setMediaSourceMode('url')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      className={`px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
                         mediaSourceMode === 'url'
                           ? 'bg-violetBrand text-white shadow-pop-sm'
                           : 'text-slate-600 hover:text-slateDark'
@@ -1078,7 +1078,7 @@ export const PublisherView: React.FC<PublisherViewProps> = ({ config, onPostPubl
                     <button
                       type="button"
                       onClick={() => setMediaSourceMode('upload')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      className={`px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
                         mediaSourceMode === 'upload'
                           ? 'bg-violetBrand text-white shadow-pop-sm'
                           : 'text-slate-600 hover:text-slateDark'

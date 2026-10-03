@@ -328,6 +328,12 @@ export interface GrowthCalendarItem {
   imageUrl?: string;
   link: string;
 
+  // Rich Idea & Creative Production fields
+  ideaCategory?: 'Reel' | 'Post' | 'Carousel' | 'Story';
+  targetDuration?: string; // e.g. "7–15 seconds" or "Carousel (6-8 slides)"
+  timelineScenes?: string; // e.g. "Scene 1 (0-3s): Hook | Scene 2 (3-8s): Value | Scene 3 (8-12s): CTA"
+  fullScript?: string;     // Full spoken voiceover / slide-by-slide script
+
   // 18 Standardized Calendar Table & Export Fields
   dateStr?: string;
   dayOfWeek?: string;
@@ -352,6 +358,22 @@ export interface WeeklyExperiment {
   threshold: string;
 }
 
+export interface FreshAccountSettingRecommendation {
+  settingName: string;
+  recommendedValue: string;
+  inAppPath: string;
+  reason: string;
+}
+
+export interface BioBlueprint {
+  nameLine: string;
+  category: string;
+  transformationHook: string;
+  socialProof: string;
+  callToAction: string;
+  linkInBioTip: string;
+}
+
 export interface FullGrowthStrategyResult {
   accountUsername?: string;
   followersCount?: number;
@@ -373,7 +395,11 @@ export interface FullGrowthStrategyResult {
   weeklySprints: WeeklyExperiment[];
   essentialMetrics: string[];
   nextActions: string[];
+  freshAccountSettings?: FreshAccountSettingRecommendation[];
+  bioBlueprint?: BioBlueprint;
   timeZoneInfo?: ProfileTimezoneInfo;
+  targetDays?: number;
+  targetMix?: FormatMix;
   isAiGenerated?: boolean;
   aiProvider?: string;
   generatedAt: string;
